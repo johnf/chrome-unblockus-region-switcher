@@ -1,0 +1,9 @@
+#!/bin/bash -e
+
+dir=$(pwd)
+name=unblockus-netflix-region-switcher
+zip="build/$name.zip"
+
+FILES="background.js global.js icon.png manifest.json popup.html popup.js"
+rm -f $zip
+(cd "$dir" && zip -qr -9 -X "$zip" $FILES)

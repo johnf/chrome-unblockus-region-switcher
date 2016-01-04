@@ -1,0 +1,25 @@
+{
+  "manifest_version": 2,
+  "name": "UnblockUs Netflix Region Switcher",
+  "short_name": "unblock-us-netflix-region-switcher",
+  "author": "John Ferlito <johnf@inodes.org>",
+  "version": "0.1",
+
+  "description": "Allows you to set your UnblockUs Netflix region",
+
+  "background": {
+    "scripts": [ "global.js", "background.js" ]
+  },
+
+  "browser_action": {
+    "default_icon": "icon.png",
+    "default_popup": "popup.html"
+  },
+
+  "permissions": [
+    "alarms",
+    "notifications",
+    "storage",
+    "https://*.unblock-us.com/"
+  ]
+}
