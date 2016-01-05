@@ -1,4 +1,6 @@
 function sendNotification(msg) {
+  debug("sendNotification(" + msg + ")");
+
   var notificationId = 'unblockus_checker';
   var options = {
     'type': 'basic',
@@ -9,7 +11,6 @@ function sendNotification(msg) {
 
   chrome.notifications.create(notificationId, options);
 }
-
 
 var canvas = document.createElement("canvas");
 var canvasContext = canvas.getContext("2d");
@@ -24,6 +25,8 @@ image.onload = function() {
 image.src = "https://www.unblock-us.com/images/icn/favicon.ico";
 
 function setIcon(region) {
+  debug("setIcon(" + region + ")");
+
   var region_name = regionMap(region).replace(/ /, '');
 
   var image = new Image();
@@ -69,32 +72,45 @@ function regionMap(region) {
   return regions[region] || region;
 }
 
-function checkRegion() {
+function checkRegion(callback) {
+  debug("checkRegion()");
+
   var xhr = new XMLHttpRequest();
   xhr.open("GET", "https://check.unblock-us.com/get-status.js", true);
   xhr.onreadystatechange = function() {
+    debug("checkRegion: readyState -> " + xhr.readyState);
     if (xhr.readyState == 4) {
       var json = xhr.responseText;
       json = json.replace(/^json\((.*)\);$/, '$1');
       var resp = JSON.parse(json);
 
       updateMeta(resp);
+      if (callback) {
+        callback();
+      }
     }
   };
+  debug("checkRegion xhr.send()");
   xhr.send();
 }
 
-chrome.storage.onChanged.addListener(function(changes, namespace) {
-  for (var key in changes) {
-    var storageChange = changes[key];
+function addStorageListener() {
+  chrome.storage.onChanged.addListener(function(changes, namespace) {
+    debug("storageChanged");
 
-    if (key === 'region') {
-      regionChanged(storageChange.oldValue, storageChange.newValue);
+    for (var key in changes) {
+      var storageChange = changes[key];
+
+      if (key === 'region') {
+        regionChanged(storageChange.oldValue, storageChange.newValue);
+      }
     }
-  }
-});
+  });
+}
 
 function updateMeta(data) {
+  debug("updateMeta(" + data.current + ")");
+
   if (data.email === '') {
     sendNotification('Please log in to UnblockUs at http://unblock-us.com');
     return;
@@ -103,22 +119,65 @@ function updateMeta(data) {
   chrome.storage.local.set({ "region" : data.current });
 }
 
-function setRegion(region) {
+function setRegion(region, callback) {
+  debug("setRegion(" + region + ")");
+
   var xhr = new XMLHttpRequest();
   xhr.open("GET", "https://realcheck.unblock-us.com/set-country.php?code=" + region, true);
   xhr.onreadystatechange = function() {
     if (xhr.readyState == 4) {
-      checkRegion();
+      checkRegion(callback);
     }
   };
   xhr.send();
 }
 
 function regionChanged(oldRegion, newRegion) {
+  debug("regionChanges(" + oldRegion + ", " + newRegion + ")");
+
   sendNotification('Region has changed from ' + regionMap(oldRegion) + ' to ' + regionMap(newRegion));
   setIcon(newRegion);
 }
 
-chrome.storage.local.get('region', function(items) {
-  setIcon(items.region);
-});
+// Set up the alarm
+function createAlarm() {
+  var name = 'unblockus_checker';
+  var alarmInfo = {
+    'when': Date.now(),
+    'periodInMinutes': 5
+  };
+
+  chrome.alarms.onAlarm.addListener( function(alarm) {
+    checkRegion();
+  });
+
+  chrome.alarms.create(name, alarmInfo);
+}
+
+function isDevMode() {
+  return !('update_url' in chrome.runtime.getManifest());
+}
+
+function debug(msg) {
+  if (isDevMode()) {
+    console.log(msg);
+  }
+}
+
+function clickHandler(el) {
+  var row = this;
+  var country = row.dataset.country;
+  setRegion(country, function() {
+    window.close();
+  });
+}
+
+function setupPopup() {
+  document.addEventListener('DOMContentLoaded', function() {
+    var rows = document.getElementsByTagName("tr");
+    for(var i = 0; i < rows.length; i++)
+    {
+      rows[i].addEventListener('click', clickHandler.bind(rows[i]), false);
+    }
+  });
+}
